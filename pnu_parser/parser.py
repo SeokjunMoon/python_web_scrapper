@@ -10,8 +10,9 @@ import pymysql
 
 page_sources = []
 notices = []
-base_url = "https://cse.pusan.ac.kr"
-cse_notice_page = f"{base_url}/cse/14651/subview.do"
+cse_base_url = "https://cse.pusan.ac.kr"
+cse_notice_page = f"{cse_base_url}/cse/14651/subview.do"
+pnu_notice_page = f"https://www.pusan.ac.kr/kor/CMS/Board/Board.do?mgr_seq=3&page="
 page_count = 0
 
 
@@ -29,9 +30,25 @@ options.add_argument(
     "Chrome/61.0.3163.100 Safari/537.36")
 options.add_argument("lang=ko_KR")
 
+
+print("Connecting to mysql database...")
+con = pymysql.connect(host='104.196.224.16', user='root', password='ms38559851!',
+                        db='pnu_parser', charset='utf8')
+
+cursor = con.cursor()
+read_sql = "SELECT * from cse;"
+
+print("Reading database...")
+
+cursor.execute(read_sql)
+rows = cursor.fetchall()
+recent_index = rows[-1][1]
+
+print("Recent announcement index is", recent_index)
+
+
 browser = webdriver.Chrome(ChromeDriverManager().install(), options=options)
 browser.get(cse_notice_page)
-
 soup = BeautifulSoup(browser.page_source, "html.parser")
 
 print("Check page counts...")
@@ -44,6 +61,7 @@ page_count = len(page_list)
 print("Complete")
 print("Parsing announcements...")
 
+end_point = False
 for i in range(1, page_count + 1):
     browser.switch_to.active_element.find_element(By.XPATH, f'//*[@id="menu14651_obj251"]/div[2]/form[3]/div[1]/div/ul/li[{i}]').click()
     sources = []
@@ -57,8 +75,13 @@ for i in range(1, page_count + 1):
         date_info = notice.find('td', class_="_artclTdRdate")
         
         index_ = index_info.string
-        if (index_ is None):
+        if index_ is None:
             continue
+        else:
+            index_ = int(index_)
+            if index_ <= recent_index:
+                end_point = True
+                break
 
         title_ = title_info.find('strong').string
         link_ = title_info['href']
@@ -67,39 +90,29 @@ for i in range(1, page_count + 1):
         sources.append({
             'index': index_,
             'title': title_.replace(",", " "),
-            'link': f"{base_url}{link_}",
+            'link': f"{cse_base_url}{link_}",
             'date': date_
         })
+
     sources = sources[::-1]
     page_sources.append(sources)
+
+    if end_point is True:
+        break
+    
 
 page_sources = page_sources[::-1]
 browser.quit()
 
 print("Complete")
+print("New announcements is", page_sources)
+print("Insert new announcements in database...")
 
-print("Connecting to mysql database...")
-con = pymysql.connect(host='104.196.224.16', user='root', password='ms38559851!',
-                        db='pnu_parser', charset='utf8')
-
-cursor = con.cursor()
 insert_sql = "INSERT INTO cse VALUES (%(index)s, %(title)s, %(link)s, %(date)s);"
-read_sql = "SELECT * from cse;"
-
-print("Reading database...")
-cursor.execute(read_sql)
-rows = cursor.fetchall()
-recent_index = 0
-
-for row in rows:
-    if row[0] > recent_index:
-        recent_index = row[0]
-
-print("Insert announcements in database...")
 for page_source in page_sources:
     for notice in page_source:
-        if int(notice['index']) > recent_index:
-            cursor.execute(insert_sql, notice)
+        # if int(notice['index']) > recent_index:
+        cursor.execute(insert_sql, notice)
 
 con.commit()
 con.close()
