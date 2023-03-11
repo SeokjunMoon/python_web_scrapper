@@ -2,7 +2,9 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
-from os import path
+import pymysql
+# from os import path
+
 
 
 
@@ -32,10 +34,15 @@ browser.get(cse_notice_page)
 
 soup = BeautifulSoup(browser.page_source, "html.parser")
 
+print("Check page counts...")
+
 page_inner = soup.find('div', class_="_inner")
 page_ul = page_inner.find('ul')
 page_list = page_ul.find_all('li')
 page_count = len(page_list)
+
+print("Complete")
+print("Parsing announcements...")
 
 for i in range(1, page_count + 1):
     browser.switch_to.active_element.find_element(By.XPATH, f'//*[@id="menu14651_obj251"]/div[2]/form[3]/div[1]/div/ul/li[{i}]').click()
@@ -69,25 +76,55 @@ for i in range(1, page_count + 1):
 page_sources = page_sources[::-1]
 browser.quit()
 
-file_name = "./github/python_web_scrapper/pnu_parser/PNU_CSE_공지사항.csv"
+print("Complete")
 
-if not path.exists(file_name):
-    create_file = open(file_name, 'w', encoding='utf-8-sig')
-    create_file.write("Title,Link,Date\n")
-    for page_source in page_sources:
-        for notice in page_source:
-            create_file.write(f"{notice['index']},{notice['title']},{notice['link']},{notice['date']}\n")
+print("Connecting to mysql database...")
+con = pymysql.connect(host='104.196.224.16', user='root', password='ms38559851!',
+                        db='pnu_parser', charset='utf8')
 
-else:
-    with open(file_name, 'r') as f:
-        last_line = f.readlines()[-1]
+cursor = con.cursor()
+insert_sql = "INSERT INTO cse VALUES (%(index)s, %(title)s, %(link)s, %(date)s);"
+read_sql = "SELECT * from cse;"
+
+print("Reading database...")
+cursor.execute(read_sql)
+rows = cursor.fetchall()
+recent_index = 0
+
+for row in rows:
+    if row[0] > recent_index:
+        recent_index = row[0]
+
+print("Insert announcements in database...")
+for page_source in page_sources:
+    for notice in page_source:
+        if int(notice['index']) > recent_index:
+            cursor.execute(insert_sql, notice)
+
+con.commit()
+con.close()
+
+print("Complete all tasks.")
+
+# file_name = "./github/python_web_scrapper/pnu_parser/PNU_CSE_공지사항.csv"
+
+# if not path.exists(file_name):
+#     create_file = open(file_name, 'w', encoding='utf-8-sig')
+#     create_file.write("Title,Link,Date\n")
+#     for page_source in page_sources:
+#         for notice in page_source:
+#             create_file.write(f"{notice['index']},{notice['title']},{notice['link']},{notice['date']}\n")
+
+# else:
+#     with open(file_name, 'r') as f:
+#         last_line = f.readlines()[-1]
     
-    last_index = int(last_line.split(',')[0])
-    modify_file = open(file_name, 'a', encoding='utf-8-sig')
+#     last_index = int(last_line.split(',')[0])
+#     modify_file = open(file_name, 'a', encoding='utf-8-sig')
 
-    for page_source in page_sources:
-        for notice in page_source:
-            current_index = int(notice['index'])
-            if current_index <= last_index:
-                continue
-            modify_file.write(f"{notice['index']},{notice['title']},{notice['link']},{notice['date']}\n")
+#     for page_source in page_sources:
+#         for notice in page_source:
+#             current_index = int(notice['index'])
+#             if current_index <= last_index:
+#                 continue
+#             modify_file.write(f"{notice['index']},{notice['title']},{notice['link']},{notice['date']}\n")
