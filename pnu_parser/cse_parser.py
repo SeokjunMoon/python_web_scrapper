@@ -14,10 +14,14 @@ class CseParser(Parser):
         print("Reading database...")
 
         con, cursor = self.getConnection()
-        read_sql = "SELECT * from cse;"
+        read_sql = "SELECT * from pnu where type='cse';"
         cursor.execute(read_sql)
         rows = cursor.fetchall()
-        self.recent_index = rows[-1][1]
+
+        if len(rows) == 0:
+            self.recent_index = 0
+        else:
+            self.recent_index = rows[-1][2]
 
         print("Recent announcement index is", self.recent_index)
         con.commit()
@@ -30,7 +34,7 @@ class CseParser(Parser):
 
         print("Parsing announcements...")
         end_point = False
-        for i in range(1, 4):
+        for i in range(1, 10):
             browser.switch_to.active_element.find_element(By.XPATH, f'//*[@id="menu14651_obj251"]/div[2]/form[3]/div[1]/div/ul/li[{i}]').click()
             sources = []
             soup_ = BeautifulSoup(browser.page_source, "html.parser")
@@ -57,10 +61,11 @@ class CseParser(Parser):
 
                 sources.append({
                     'id': 0,
+                    'type': 'cse',
                     'index': index_,
                     'title': title_.replace(",", " "),
                     'link': f"{self.base_url}{link_}",
-                    'date': date_
+                    'date': date_.replace(".", "-")
                 })
 
             sources = sources[::-1]
@@ -80,7 +85,7 @@ class CseParser(Parser):
     def saveData(self):
         print("Insert new announcements in database...")
         con, cursor = self.getConnection()
-        insert_sql = "INSERT INTO cse VALUES (%(id)s, %(index)s, %(title)s, %(link)s, %(date)s);"
+        insert_sql = "INSERT INTO pnu VALUES (%(id)s, %(type)s, %(index)s, %(title)s, %(link)s, %(date)s);"
 
         for page_source in self.page_sources:
             for notice in page_source:

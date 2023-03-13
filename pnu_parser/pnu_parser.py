@@ -14,14 +14,14 @@ class PnuParser(Parser):
         print("Reading database...")
 
         con, cursor = self.getConnection()
-        read_sql = "SELECT * from pnu;"
+        read_sql = "SELECT * from pnu where type='pnu';"
         cursor.execute(read_sql)
         rows = cursor.fetchall()
 
         if len(rows) == 0:
             self.recent_index = 0
         else:
-            self.recent_index = rows[-1][1]
+            self.recent_index = rows[-1][2]
 
         print("Recent announcement index is", self.recent_index)
         con.commit()
@@ -61,10 +61,11 @@ class PnuParser(Parser):
 
                 sources.append({
                     'id': 0,
+                    'type': 'pnu',
                     'index': index_,
                     'title': title_.replace(",", " "),
                     'link': f"{self.base_url}{link_}",
-                    'date': date_
+                    'date': date_.replace(".", "-")
                 })
 
             sources = sources[::-1]
@@ -86,7 +87,7 @@ class PnuParser(Parser):
     def saveData(self):
         print("Insert new announcements in database...")
         con, cursor = self.getConnection()
-        insert_sql = "INSERT INTO pnu VALUES (%(id)s, %(index)s, %(title)s, %(link)s, %(date)s);"
+        insert_sql = "INSERT INTO pnu VALUES (%(id)s, %(type)s, %(index)s, %(title)s, %(link)s, %(date)s);"
 
         for page_source in self.page_sources:
             for notice in page_source:
