@@ -85,14 +85,17 @@ class PnuParser(Parser):
 
 
     def saveData(self):
-        print("Insert new announcements in database...")
-        con, cursor = self.getConnection()
-        insert_sql = "INSERT INTO pnu VALUES (%(id)s, %(type)s, %(index)s, %(title)s, %(link)s, %(date)s);"
+        if len(self.page_sources) != 0:
+            print("Insert new announcements in database...")
+            con, cursor = self.getConnection()
+            insert_sql = "INSERT INTO pnu VALUES (%(id)s, %(type)s, %(index)s, %(title)s, %(link)s, %(date)s);"
 
-        for page_source in self.page_sources:
-            for notice in page_source:
-                cursor.execute(insert_sql, notice)
+            for page_source in self.page_sources:
+                for notice in page_source:
+                    cursor.execute(insert_sql, notice)
 
-        print("Complete")
-        con.commit()
-        con.close()
+            print("Complete")
+            con.commit()
+            con.close()
+        else:
+            print("No updating")
